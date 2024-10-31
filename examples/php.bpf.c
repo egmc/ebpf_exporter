@@ -71,4 +71,30 @@ int BPF_USDT(exception_count, char *arg0)
     return 0;
 }
 
+#define MAX_SLOT 50
+
+struct hist_key_t {
+    u64 bucket;
+};
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, MAX_SLOT + 1);
+    __type(key, struct hist_key_t);
+    __type(value, u64);
+} memcached_val_length SEC(".maps");
+
+// uprobe: libmemcached.so の memcached_set にフック
+SEC("uprobe//usr/lib/x86_64-linux-gnu/libmemcached.so.11:memcached_set")
+int uprobe_memcached_set(struct pt_regs *ctx) {
+
+    uint arg2 = (uint)PT_REGS_PARM5(ctx);
+
+    // 取得した第2引数の値を出力
+    static const char fmt[] = "Value: %d\n"; 
+    bpf_trace_printk(fmt, sizeof(fmt), arg2);
+
+    return 0;
+}
+
 char LICENSE[] SEC("license") = "GPL";
