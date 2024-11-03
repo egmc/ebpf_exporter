@@ -14,4 +14,15 @@ metrics:
           size: 128
           decoders:
             - name: string
-
+  histograms:
+    - name: memcached_val_length
+      help: memcached set size histgram
+      bucket_type: exp2
+      bucket_min: 0
+      bucket_max: 27
+      bucket_multiplier: 1
+      labels:
+        - name: bucket
+          size: 8
+          decoders:
+            - name: uint

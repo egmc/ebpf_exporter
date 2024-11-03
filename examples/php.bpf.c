@@ -71,7 +71,7 @@ int BPF_USDT(exception_count, char *arg0)
     return 0;
 }
 
-#define MAX_SLOT 50
+#define MAX_SLOT 27
 
 struct hist_key_t {
     u64 bucket;
@@ -88,8 +88,10 @@ struct {
 SEC("uprobe//usr/lib/x86_64-linux-gnu/libmemcached.so.11:memcached_set")
 int uprobe_memcached_set(struct pt_regs *ctx) {
 
-    uint arg5 = (uint)PT_REGS_PARM5(ctx);
+    u64 arg5 = (u64)PT_REGS_PARM5(ctx);
     const char *arg4 = (const char *)PT_REGS_PARM4(ctx);
+
+    struct hist_key_t key = {};
 
     // 取得した第2引数の値を出力
     static const char fmt[] = "Value: %d\n"; 
@@ -97,6 +99,7 @@ int uprobe_memcached_set(struct pt_regs *ctx) {
     bpf_trace_printk(fmt, sizeof(fmt), arg5);
     bpf_trace_printk(fmtstr, sizeof(fmtstr), arg4);
 
+    increment_exp2_histogram(&memcached_val_length, key, arg5, MAX_SLOT);
 
     return 0;
 }
