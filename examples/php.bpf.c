@@ -71,7 +71,7 @@ int BPF_USDT(exception_count, char *arg0)
     return 0;
 }
 
-#define MAX_SLOT 27
+#define MAX_SLOT 22
 
 struct hist_key_t {
     u64 bucket;
@@ -82,7 +82,7 @@ struct {
     __uint(max_entries, MAX_SLOT + 1);
     __type(key, struct hist_key_t);
     __type(value, u64);
-} memcached_val_length SEC(".maps");
+} memcached_set_val_length SEC(".maps");
 
 // uprobe: libmemcached.so の memcached_set にフック
 SEC("uprobe//usr/lib/x86_64-linux-gnu/libmemcached.so.11:memcached_set")
@@ -99,7 +99,7 @@ int uprobe_memcached_set(struct pt_regs *ctx) {
     bpf_trace_printk(fmt, sizeof(fmt), arg5);
     bpf_trace_printk(fmtstr, sizeof(fmtstr), arg4);
 
-    increment_exp2_histogram(&memcached_val_length, key, arg5, MAX_SLOT);
+    increment_exp2_histogram(&memcached_set_val_length, key, arg5, MAX_SLOT);
 
     return 0;
 }
