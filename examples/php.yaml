@@ -14,6 +14,13 @@ metrics:
           size: 128
           decoders:
             - name: string
+    - name: php_exception_caught_total
+      help: Number of php:exception__caught USDT calls per class
+      labels:
+        - name: class
+          size: 128
+          decoders:
+            - name: string
   histograms:
     - name: memcached_set_val_length
       help: memcached set size histgram

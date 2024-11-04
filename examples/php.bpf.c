@@ -28,6 +28,13 @@ struct {
     __type(value, u64);
 } php_exception_thrown_total SEC(".maps");
 
+struct {
+    __uint(type, BPF_MAP_TYPE_LRU_HASH);
+    __uint(max_entries, 100);
+    __type(key, struct exception_t);
+    __type(value, u64);
+} php_exception_caught_total SEC(".maps");
+
 
 int truncate_string(char *str, int max_length) {
     int i;
@@ -53,6 +60,9 @@ int BPF_USDT(do_count, char *arg0, char *arg1)
 
     truncate_string(call.filename, MAX_STR_LEN);
 
+    static const char fmtstr[] = "compile file entry: %s, %s\n"; 
+    bpf_trace_printk(fmtstr, sizeof(fmtstr), arg0, arg1);
+
     increment_map(&php_compile_file_total, &call, 1);
 
     return 0;
@@ -62,11 +72,27 @@ int BPF_USDT(do_count, char *arg0, char *arg1)
 SEC("usdt//usr/lib/apache2/modules/libphp8.1.so:php:exception__thrown")
 int BPF_USDT(exception_count, char *arg0) 
 {
+    struct exception_t exception_thrown = {};
+
+    bpf_probe_read_user_str(&exception_thrown.class, sizeof(exception_thrown.class), arg0);
+
+    increment_map(&php_exception_thrown_total, &exception_thrown, 1);
+
+    return 0;
+}
+
+SEC("usdt//usr/lib/apache2/modules/libphp8.1.so:php:exception__caught")
+int BPF_USDT(exception_count2, char *arg0) 
+{
     struct exception_t exception = {};
 
     bpf_probe_read_user_str(&exception.class, sizeof(exception.class), arg0);
 
-    increment_map(&php_exception_thrown_total, &exception, 1);
+    static const char fmtstr[] = "exception caught: %s\n"; 
+    bpf_trace_printk(fmtstr, sizeof(fmtstr), arg0);
+
+
+    increment_map(&php_exception_caught_total, &exception, 1);
 
     return 0;
 }
