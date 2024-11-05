@@ -97,6 +97,35 @@ int BPF_USDT(exception_count2, char *arg0)
     return 0;
 }
 
+SEC("usdt//usr/lib/apache2/modules/libphp8.1.so:php:request__startup")
+int BPF_USDT(request_startup, char *arg0, char *arg1, char *arg2)
+{
+ 
+    u64 ts = bpf_ktime_get_ns();
+    u32 pid = bpf_get_current_pid_tgid();
+    static const char fmtstr[] = "request startup: %s, %s, %s\n"; 
+    static const char fmtu64[] = "request startup time: %llu\n"; 
+    static const char fmtu32[] = "request startup pid: %u\n"; 
+    bpf_trace_printk(fmtstr, sizeof(fmtstr), arg0, arg1, arg2);
+    bpf_trace_printk(fmtu64, sizeof(fmtu64), ts);
+    bpf_trace_printk(fmtu32, sizeof(fmtu32), pid);
+
+    return 0;
+}
+
+SEC("usdt//usr/lib/apache2/modules/libphp8.1.so:php:request__shutdown")
+int BPF_USDT(request_shutdown, char *arg0, char *arg1, char *arg2)
+{
+ 
+    u64 ts = bpf_ktime_get_ns();
+    static const char fmtstr[] = "request shutdown: %s, %s, %s\n"; 
+    static const char fmtu64[] = "request shutdown time: %llu\n"; 
+    bpf_trace_printk(fmtstr, sizeof(fmtstr), arg0, arg1, arg2);
+    bpf_trace_printk(fmtu64, sizeof(fmtu64), ts);
+
+    return 0;
+}
+
 #define MAX_SLOT 22
 
 struct hist_key_t {
