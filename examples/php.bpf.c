@@ -14,6 +14,12 @@ struct exception_t {
     char class[MAX_CLASS_LEN];
 };
 
+struct php_req_key {
+    u32 pid;
+    char request_uri[MAX_STR_LEN];
+    char request_method[5];
+};
+
 struct {
     __uint(type, BPF_MAP_TYPE_LRU_HASH);
     __uint(max_entries, 65536);
@@ -34,6 +40,13 @@ struct {
     __type(key, struct exception_t);
     __type(value, u64);
 } php_exception_caught_total SEC(".maps");
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 10000);
+    __type(key, struct php_req_key);
+    __type(value, u64);
+} php_req SEC(".maps");
 
 
 int truncate_string(char *str, int max_length) {
@@ -110,6 +123,13 @@ int BPF_USDT(request_startup, char *arg0, char *arg1, char *arg2)
     bpf_trace_printk(fmtu64, sizeof(fmtu64), ts);
     bpf_trace_printk(fmtu32, sizeof(fmtu32), pid);
 
+    struct php_req_key key;
+    key.pid = pid;
+    bpf_probe_read_user_str(&key.request_uri, sizeof(key.request_uri), arg1);
+    bpf_probe_read_user_str(&key.request_method, sizeof(key.request_method), arg2);
+    bpf_map_update_elem(&php_req, &key, &ts, BPF_ANY);
+
+
     return 0;
 }
 
@@ -117,11 +137,29 @@ SEC("usdt//usr/lib/apache2/modules/libphp8.1.so:php:request__shutdown")
 int BPF_USDT(request_shutdown, char *arg0, char *arg1, char *arg2)
 {
  
-    u64 ts = bpf_ktime_get_ns();
+    u64 *tsp, delta_us, ts = bpf_ktime_get_ns();
+    u32 pid = bpf_get_current_pid_tgid();
     static const char fmtstr[] = "request shutdown: %s, %s, %s\n"; 
-    static const char fmtu64[] = "request shutdown time: %llu\n"; 
+    static const char fmtu64[] = "request shutdown time: %llu\n";
+    static const char fmtu32[] = "request shutdown pid: %u\n"; 
+    static const char fmtu64delta[] = "request shutdown elapsed: %llu\n"; 
     bpf_trace_printk(fmtstr, sizeof(fmtstr), arg0, arg1, arg2);
     bpf_trace_printk(fmtu64, sizeof(fmtu64), ts);
+    bpf_trace_printk(fmtu32, sizeof(fmtu32), pid);
+
+    struct php_req_key key;
+    key.pid = pid;
+    bpf_probe_read_user_str(&key.request_uri, sizeof(key.request_uri), arg1);
+    bpf_probe_read_user_str(&key.request_method, sizeof(key.request_method), arg2);
+    
+    tsp = bpf_map_lookup_elem(&php_req, &key);
+    if (!tsp) {
+        return 0;
+    }
+
+    delta_us = (ts - *tsp) / 1000;
+
+    bpf_trace_printk(fmtu64delta, sizeof(fmtu64delta), delta_us);
 
     return 0;
 }
