@@ -41,13 +41,18 @@ struct {
     __type(value, u64);
 } php_exception_caught_total SEC(".maps");
 
+// struct {
+//     __uint(type, BPF_MAP_TYPE_HASH);
+//     __uint(max_entries, 10000);
+//     __type(key, struct php_req_key);
+//     __type(value, u64);
+// } php_req SEC(".maps");
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 10000);
-    __type(key, struct php_req_key);
+    __type(key, u32);
     __type(value, u64);
 } php_req SEC(".maps");
-
 
 int truncate_string(char *str, int max_length) {
     int i;
@@ -127,7 +132,7 @@ int BPF_USDT(request_startup, char *arg0, char *arg1, char *arg2)
     key.pid = pid;
     bpf_probe_read_user_str(&key.request_uri, sizeof(key.request_uri), arg1);
     bpf_probe_read_user_str(&key.request_method, sizeof(key.request_method), arg2);
-    bpf_map_update_elem(&php_req, &key, &ts, BPF_ANY);
+    bpf_map_update_elem(&php_req, &pid, &ts, BPF_ANY);
 
 
     return 0;
@@ -152,7 +157,7 @@ int BPF_USDT(request_shutdown, char *arg0, char *arg1, char *arg2)
     bpf_probe_read_user_str(&key.request_uri, sizeof(key.request_uri), arg1);
     bpf_probe_read_user_str(&key.request_method, sizeof(key.request_method), arg2);
     
-    tsp = bpf_map_lookup_elem(&php_req, &key);
+    tsp = bpf_map_lookup_elem(&php_req, &pid);
     if (!tsp) {
         return 0;
     }
