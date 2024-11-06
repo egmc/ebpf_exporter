@@ -54,6 +54,36 @@ struct {
     __type(value, u64);
 } php_req SEC(".maps");
 
+#define MAX_SLOT 22
+
+struct hist_key_t {
+    u64 bucket;
+};
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, MAX_SLOT + 1);
+    __type(key, struct hist_key_t);
+    __type(value, u64);
+} memcached_set_val_length SEC(".maps");
+
+#define MAX_SLOT_PHP_REQ 27
+
+struct php_req_hist_key_t {
+    char request_uri[MAX_STR_LEN];
+    char request_method[8];
+    u64 bucket;
+};
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, MAX_SLOT_PHP_REQ + 1);
+    __type(key, struct php_req_hist_key_t);
+    __type(value, u64);
+} php_request_time_sec SEC(".maps");
+
+
+
 int truncate_string(char *str, int max_length) {
     int i;
 
@@ -152,10 +182,13 @@ int BPF_USDT(request_shutdown, char *arg0, char *arg1, char *arg2)
     bpf_trace_printk(fmtu64, sizeof(fmtu64), ts);
     bpf_trace_printk(fmtu32, sizeof(fmtu32), pid);
 
-    struct php_req_key key;
-    key.pid = pid;
-    bpf_probe_read_user_str(&key.request_uri, sizeof(key.request_uri), arg1);
-    bpf_probe_read_user_str(&key.request_method, sizeof(key.request_method), arg2);
+    // struct php_req_key key;
+    // key.pid = pid;
+    // bpf_probe_read_user_str(&key.request_uri, sizeof(key.request_uri), arg1);
+    // bpf_probe_read_user_str(&key.request_method, sizeof(key.request_method), arg2);
+    struct php_req_hist_key_t hist_key = {};
+    bpf_probe_read_user_str(&hist_key.request_uri, sizeof(hist_key.request_uri), arg1);
+    bpf_probe_read_user_str(&hist_key.request_method, sizeof(hist_key.request_method), arg2);
     
     tsp = bpf_map_lookup_elem(&php_req, &pid);
     if (!tsp) {
@@ -166,21 +199,13 @@ int BPF_USDT(request_shutdown, char *arg0, char *arg1, char *arg2)
 
     bpf_trace_printk(fmtu64delta, sizeof(fmtu64delta), delta_us);
 
+
+    increment_exp2_histogram(&php_request_time_sec, hist_key, delta_us, MAX_SLOT_PHP_REQ);
+
     return 0;
 }
 
-#define MAX_SLOT 22
 
-struct hist_key_t {
-    u64 bucket;
-};
-
-struct {
-    __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, MAX_SLOT + 1);
-    __type(key, struct hist_key_t);
-    __type(value, u64);
-} memcached_set_val_length SEC(".maps");
 
 // uprobe: libmemcached.so の memcached_set にフック
 SEC("uprobe//usr/lib/x86_64-linux-gnu/libmemcached.so.11:memcached_set")

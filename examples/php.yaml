@@ -33,3 +33,22 @@ metrics:
           size: 8
           decoders:
             - name: uint
+    - name: php_request_time_sec
+      help: PHP ELAPSED TIME SEC from startup to shutdown
+      bucket_type: exp2
+      bucket_min: 0
+      bucket_max: 27
+      bucket_multiplier: 0.000001 # microseconds to seconds
+      labels:
+        - name: request_uri
+          size: 256
+          decoders:
+            - name: string
+        - name: request_method
+          size: 8
+          decoders:
+            - name: string
+        - name: bucket
+          size: 8
+          decoders:
+            - name: uint
