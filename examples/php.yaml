@@ -1,0 +1,54 @@
+metrics:
+  counters:
+    - name: php_compile_file_total
+      help: Number of php:compile__file__entry USDT calls per filepath
+      labels:
+        - name: filename
+          size: 256
+          decoders:
+            - name: string
+    - name: php_exception_thrown_total
+      help: Number of php:exception__thrown USDT calls per class
+      labels:
+        - name: class
+          size: 128
+          decoders:
+            - name: string
+    - name: php_exception_caught_total
+      help: Number of php:exception__caught USDT calls per class
+      labels:
+        - name: class
+          size: 128
+          decoders:
+            - name: string
+  histograms:
+    - name: memcached_set_val_length
+      help: memcached set size histgram
+      bucket_type: exp2
+      bucket_min: 0
+      bucket_max: 22
+      bucket_multiplier: 1
+      labels:
+        - name: bucket
+          size: 8
+          decoders:
+            - name: uint
+    - name: php_request_time_sec
+      help: PHP ELAPSED TIME SEC from startup to shutdown
+      bucket_type: exp2
+      bucket_min: 0
+      bucket_max: 27
+      bucket_multiplier: 0.000001 # microseconds to seconds
+      labels:
+        - name: request_uri
+          size: 256
+          decoders:
+            - name: string
+        - name: request_method
+          size: 8
+          decoders:
+            - name: string
+        - name: bucket
+          size: 8
+          decoders:
+            - name: uint
